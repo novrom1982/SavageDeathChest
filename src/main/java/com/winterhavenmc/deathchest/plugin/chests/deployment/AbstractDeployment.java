@@ -11,7 +11,7 @@
  * General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ * along with this program. If not, see <http://gnu.org>.
  *
  */
 
@@ -28,6 +28,7 @@ import com.winterhavenmc.deathchest.plugin.models.chestblock.ChestBlock;
 import com.winterhavenmc.deathchest.plugin.models.chestblock.ValidChestBlock;
 import com.winterhavenmc.deathchest.plugin.models.deathchest.ValidDeathChest;
 
+import org.bukkit.ChatColor;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.block.Block;
@@ -48,6 +49,8 @@ public abstract class AbstractDeployment implements Deployment
 	protected final PluginMain plugin;
 	protected final Player player;
 	protected final Collection<ItemStack> droppedItems;
+	protected final Location originLocation;
+	protected final Player killer;
 
 
 	/**
@@ -59,9 +62,25 @@ public abstract class AbstractDeployment implements Deployment
 	 */
 	public AbstractDeployment(final PluginMain plugin, final Player player, final Collection<ItemStack> droppedItems)
 	{
+		this(plugin, player, droppedItems, player.getLocation(), player.getKiller());
+	}
+
+
+	/**
+	 * Class constructor with custom origin location
+	 *
+	 * @param plugin reference to plugin main class
+	 * @param player the player for whom chest is being deployed
+	 * @param droppedItems the player's death drops
+	 * @param originLocation the target origin location for chest deployment
+	 */
+	public AbstractDeployment(final PluginMain plugin, final Player player, final Collection<ItemStack> droppedItems, final Location originLocation, final Player killer)
+	{
 		this.plugin = plugin;
 		this.player = player;
 		this.droppedItems = droppedItems;
+		this.originLocation = (originLocation != null) ? originLocation : player.getLocation();
+		this.killer = killer;
 	}
 
 
@@ -81,7 +100,6 @@ public abstract class AbstractDeployment implements Deployment
 	 */
 	boolean containsChest(final Collection<ItemStack> itemStacks)
 	{
-		// check for null parameter
 		if (itemStacks == null)
 		{
 			return false;
@@ -101,12 +119,7 @@ public abstract class AbstractDeployment implements Deployment
 
 
 	/**
-	 * Remove one chest from list of item stacks. If a stack contains only one chest, remove the stack from
-	 * the list and return. If a stack contains more than one chest, decrease the stack amount by one and return.
-	 *
-	 * @param itemStacks List of ItemStack to remove chest
-	 * @return Collection of ItemStacks with one chest item removed. If passed collection contained no chest items,
-	 * the returned collection will be a copy of the passed collection.
+	 * Remove one chest from list of item stacks.
 	 */
 	Collection<ItemStack> removeOneChest(final Collection<ItemStack> itemStacks)
 	{
@@ -133,8 +146,6 @@ public abstract class AbstractDeployment implements Deployment
 		}
 		return remainingItems;
 	}
-
-
 	/**
 	 * Place a chest block and fill with items
 	 *
@@ -152,7 +163,7 @@ public abstract class AbstractDeployment implements Deployment
 		setCustomInventoryName(player, block);
 
 		// set chest direction
-		setChestDirection(block, player.getLocation());
+		setChestDirection(block, originLocation);
 
 		// create new ChestBlock object
 		ChestBlock chestBlock = ChestBlock.of(deathChest.chestUid(), block.getLocation(), chestBlockType);
@@ -186,14 +197,16 @@ public abstract class AbstractDeployment implements Deployment
 	 * @param player the owner of the chest
 	 * @param block the chest block
 	 */
+	@SuppressWarnings("deprecation")
 	private void setCustomInventoryName(final Player player, final Block block)
 	{
-		plugin.messageBuilder.getConstantResolver().getString("CHEST_INFO.INVENTORY_NAME").ifPresent(string -> {
-			string = string.replace("{OWNER}", player.getName());
-			org.bukkit.block.Chest chestState = (org.bukkit.block.Chest) block.getState();
-			chestState.setCustomName(string);
+		String rawName = plugin.getConfig().getString("chest-inventory-name", "&8Сундук смерти {OWNER}");
+		String formatted = ChatColor.translateAlternateColorCodes('&', rawName.replace("{OWNER}", player.getName()));
+		if (block.getState() instanceof org.bukkit.block.Chest chestState)
+		{
+			chestState.setCustomName(formatted);
 			chestState.update();
-		});
+		}
 	}
 
 
@@ -205,38 +218,24 @@ public abstract class AbstractDeployment implements Deployment
 	 */
 	void setChestBlockState(Block block, Chest.Type chestType)
 	{
-		// get chest block state
 		BlockState chestBlockState = block.getState();
-
-		// get chest block data
 		Chest chestBlockData = (Chest) chestBlockState.getBlockData();
-
-		// set chest block data type to single chest
 		chestBlockData.setType(chestType);
-
-		// set chest block data
 		chestBlockState.setBlockData(chestBlockData);
-
-		// update chest block state
 		chestBlockState.update();
 	}
 
 
 	/**
-	 * Set chest facing direction from player death location
+	 * Set chest facing direction from origin location
 	 *
 	 * @param block the chest block
-	 * @param location the player death location
+	 * @param location the origin location
 	 */
 	private void setChestDirection(final Block block, final Location location)
 	{
-		// get block direction data
 		Directional blockData = (Directional) block.getBlockData();
-
-		// set new direction from player death location
 		blockData.setFacing(LocationUtilities.getCardinalBlockFace(location));
-
-		// set block data
 		block.setBlockData(blockData);
 	}
 
@@ -249,40 +248,36 @@ public abstract class AbstractDeployment implements Deployment
 	 */
 	void finalize(final SearchResult searchResult, final ValidDeathChest validDeathChest)
 	{
-		// if debugging, log result
 		if (plugin.getConfig().getBoolean("debug"))
 		{
 			logResult(searchResult);
 		}
 
-		// send message based on result
 		sendResultMessage(player, validDeathChest, searchResult);
 
-		// drop any remaining items that were not placed in a chest
+		final Location dropLocation = (searchResult.getLocation() != null) ? searchResult.getLocation() : originLocation;
 		for (ItemStack item : searchResult.getRemainingItems())
 		{
-			player.getWorld().dropItemNaturally(player.getLocation(), item);
+			if (dropLocation.getWorld() != null)
+			{
+				dropLocation.getWorld().dropItemNaturally(dropLocation, item);
+			}
 		}
 
-		// if result is negative cancel expire task and return
 		if (!searchResult.getResultCode().equals(SearchResultCode.SUCCESS)
 				&& !searchResult.getResultCode().equals(SearchResultCode.PARTIAL_SUCCESS))
 		{
-			// cancel DeathChest expire task
 			plugin.chestManager.cancelExpireTask(validDeathChest);
 			return;
 		}
 
-		// get configured chest protection time
 		long chestProtectionTime = plugin.getConfig().getLong("chest-protection-time");
 
-		// if protection time is zero, set to negative to display infinite time in message
 		if (chestProtectionTime == 0)
 		{
 			chestProtectionTime = -1;
 		}
 
-		// if chest protection is enabled and chest-protection-time is set (non-zero), send message
 		if (plugin.getConfig().getBoolean("chest-protection") && chestProtectionTime > 0)
 		{
 			plugin.messageBuilder.compose(player, MessageId.CHEST_DEPLOYED_PROTECTION_TIME)
@@ -290,10 +285,8 @@ public abstract class AbstractDeployment implements Deployment
 					.send();
 		}
 
-		// put DeathChest in DeathChest map
 		plugin.chestManager.putChest(validDeathChest);
 
-		// put DeathChest in datastore
 		Set<ValidDeathChest> deathChests = Collections.singleton(validDeathChest);
 		plugin.chestManager.saveChestRecords(deathChests);
 	}

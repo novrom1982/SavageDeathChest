@@ -25,6 +25,7 @@ import com.winterhavenmc.deathchest.plugin.chests.search.SearchResultCode;
 
 import com.winterhavenmc.deathchest.plugin.models.deathchest.DeathChest;
 import com.winterhavenmc.deathchest.plugin.models.deathchest.ValidDeathChest;
+import org.bukkit.Location;
 import org.bukkit.block.data.type.Chest;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
@@ -47,6 +48,11 @@ public class DoubleChestDeployment extends AbstractDeployment implements Deploym
 		super(plugin, player, droppedItems);
 	}
 
+	public DoubleChestDeployment(final PluginMain plugin, final Player player, final Collection<ItemStack> droppedItems, final Location originLocation, Player killer)
+	{
+		super(plugin, player, droppedItems, originLocation, killer);
+	}
+
 
 	/**
 	 * Execute the deployment of death chest
@@ -60,12 +66,12 @@ public class DoubleChestDeployment extends AbstractDeployment implements Deploym
 		Collection<ItemStack> remainingItems = new ArrayList<>(droppedItems);
 
 		// search for valid chest location
-		SearchResult searchResult = new QuadrantSearch(plugin, player, ChestSize.DOUBLE).execute();
+		SearchResult searchResult = new QuadrantSearch(plugin, player, ChestSize.DOUBLE, originLocation).execute();
 
 		// if only single chest location found, deploy single chest
 		if (searchResult.getResultCode().equals(SearchResultCode.PARTIAL_SUCCESS))
 		{
-			searchResult = new SingleChestDeployment(plugin, player, remainingItems).deploy();
+			searchResult = new SingleChestDeployment(plugin, player, remainingItems, originLocation, killer).deploy();
 
 			// if single chest deployment was successful, set PARTIAL_SUCCESS result
 			if (searchResult.getResultCode().equals(SearchResultCode.SUCCESS))
@@ -101,7 +107,7 @@ public class DoubleChestDeployment extends AbstractDeployment implements Deploym
 			{
 				searchResult.setResultCode(SearchResultCode.NO_REQUIRED_CHEST);
 				searchResult.setRemainingItems(remainingItems);
-				DeathChest deathChest = DeathChest.of(player, searchResult.getLocation(), plugin.getConfig());
+				DeathChest deathChest = DeathChest.of(player, killer, searchResult.getLocation(), plugin.getConfig());
 				if (deathChest instanceof ValidDeathChest validDeathChest)
 				{
 					this.finalize(searchResult, validDeathChest);
@@ -111,7 +117,7 @@ public class DoubleChestDeployment extends AbstractDeployment implements Deploym
 		}
 
 		// create new deathChest object for player
-		DeathChest deathChest = DeathChest.of(player, searchResult.getLocation(), plugin.getConfig());
+		DeathChest deathChest = DeathChest.of(player, killer, searchResult.getLocation(), plugin.getConfig());
 
 		if (deathChest instanceof ValidDeathChest validDeathChest)
 		{

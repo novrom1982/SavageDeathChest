@@ -267,7 +267,6 @@ public abstract class AbstractDeployment implements Deployment
 		if (!searchResult.getResultCode().equals(SearchResultCode.SUCCESS)
 				&& !searchResult.getResultCode().equals(SearchResultCode.PARTIAL_SUCCESS))
 		{
-			plugin.chestManager.cancelExpireTask(validDeathChest);
 			return;
 		}
 

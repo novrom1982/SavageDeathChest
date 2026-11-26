@@ -83,10 +83,20 @@ public class SingleChestDeployment extends AbstractDeployment implements Deploym
 			else
 			{
 				searchResult = new SearchResult(SearchResultCode.NO_REQUIRED_CHEST, remainingItems);
-				DeathChest deathChest = DeathChest.of(player, killer, searchResult.getLocation(), plugin.getConfig());
+				DeathChest deathChest = DeathChest.of(player, killer, originLocation, plugin.getConfig());
 				if (deathChest instanceof ValidDeathChest validDeathChest)
 				{
 					this.finalize(searchResult, validDeathChest);
+				}
+				else
+				{
+					for (ItemStack item : remainingItems)
+					{
+						if (originLocation != null && originLocation.getWorld() != null)
+						{
+							originLocation.getWorld().dropItemNaturally(originLocation, item);
+						}
+					}
 				}
 				return searchResult;
 			}

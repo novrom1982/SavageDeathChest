@@ -83,10 +83,27 @@ public class DoubleChestDeployment extends AbstractDeployment implements Deploym
 			return searchResult;
 		}
 
-		// if search failed, return result with remaining items
+		// if search failed, finalize deployment to drop items and send message
 		if (!searchResult.getResultCode().equals(SearchResultCode.SUCCESS))
 		{
 			searchResult.setRemainingItems(remainingItems);
+			final Location fallbackLocation = (searchResult.getLocation() != null) ? searchResult.getLocation() : originLocation;
+			DeathChest deathChest = DeathChest.of(player, killer, fallbackLocation, plugin.getConfig());
+			if (deathChest instanceof ValidDeathChest validDeathChest)
+			{
+				this.finalize(searchResult, validDeathChest);
+			}
+			else
+			{
+				for (ItemStack item : remainingItems)
+				{
+					if (fallbackLocation != null && fallbackLocation.getWorld() != null)
+					{
+						fallbackLocation.getWorld().dropItemNaturally(fallbackLocation, item);
+					}
+				}
+			}
+
 			return searchResult;
 		}
 

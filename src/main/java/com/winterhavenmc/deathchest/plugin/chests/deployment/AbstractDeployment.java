@@ -255,6 +255,12 @@ public abstract class AbstractDeployment implements Deployment
 
 		sendResultMessage(player, validDeathChest, searchResult);
 
+		if (!searchResult.getResultCode().equals(SearchResultCode.SUCCESS)
+				&& !searchResult.getResultCode().equals(SearchResultCode.PARTIAL_SUCCESS))
+		{
+			return;
+		}
+
 		final Location dropLocation = (searchResult.getLocation() != null) ? searchResult.getLocation() : originLocation;
 		for (ItemStack item : searchResult.getRemainingItems())
 		{

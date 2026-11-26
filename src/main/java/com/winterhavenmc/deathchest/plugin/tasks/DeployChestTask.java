@@ -1,7 +1,8 @@
 package com.winterhavenmc.deathchest.plugin.tasks;
 
 import com.winterhavenmc.deathchest.plugin.PluginMain;
-import com.winterhavenmc.deathchest.plugin.chests.deployment.DeploymentFactory;
+import com.winterhavenmc.deathchest.plugin.chests.search.SearchResult;
+import com.winterhavenmc.deathchest.plugin.chests.search.SearchResultCode;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
@@ -16,27 +17,35 @@ public final class DeployChestTask extends BukkitRunnable
 	private final Player player;
 	private final Collection<ItemStack> droppedItems;
 	private final Location originLocation;
+	private final Location deathLocation;
 	private final Player killer;
 
 
 	public DeployChestTask(final PluginMain plugin, final Player player, final Collection<ItemStack> droppedItems)
 	{
-		this(plugin, player, droppedItems, player.getLocation(), player.getKiller());
+		this(plugin, player, droppedItems, player.getLocation(), player.getLocation(), player.getKiller());
 	}
 
 
 	public DeployChestTask(final PluginMain plugin, final Player player, final Collection<ItemStack> droppedItems, final Location originLocation)
 	{
-		this(plugin, player, droppedItems, originLocation, player.getKiller());
+		this(plugin, player, droppedItems, originLocation, originLocation, player.getKiller());
 	}
 
 
 	public DeployChestTask(final PluginMain plugin, final Player player, final Collection<ItemStack> droppedItems, final Location originLocation, final Player killer)
 	{
+		this(plugin, player, droppedItems, originLocation, originLocation, killer);
+	}
+
+
+	public DeployChestTask(final PluginMain plugin, final Player player, final Collection<ItemStack> droppedItems, final Location originLocation, final Location deathLocation, final Player killer)
+	{
 		this.plugin = plugin;
 		this.player = player;
 		this.droppedItems = droppedItems;
 		this.originLocation = originLocation;
+		this.deathLocation = (deathLocation != null) ? deathLocation : originLocation;
 		this.killer = killer;
 	}
 
@@ -44,7 +53,26 @@ public final class DeployChestTask extends BukkitRunnable
 	@Override
 	public void run()
 	{
-		plugin.chestManager.getDeploymentFactory().createDeployment(plugin, player, droppedItems, originLocation, killer).deploy();
+		final SearchResult result = plugin.chestManager.getDeploymentFactory()
+				.createDeployment(plugin, player, droppedItems, originLocation, killer)
+				.deploy();
+
+		if (result != null
+				&& !result.getResultCode().equals(SearchResultCode.SUCCESS)
+				&& !result.getResultCode().equals(SearchResultCode.PARTIAL_SUCCESS))
+		{
+			final Location dropLoc = (deathLocation != null) ? deathLocation : originLocation;
+			if (dropLoc != null && dropLoc.getWorld() != null)
+			{
+				for (ItemStack item : result.getRemainingItems())
+				{
+					if (item != null)
+					{
+						dropLoc.getWorld().dropItemNaturally(dropLoc, item);
+					}
+				}
+			}
+		}
 	}
 
 }

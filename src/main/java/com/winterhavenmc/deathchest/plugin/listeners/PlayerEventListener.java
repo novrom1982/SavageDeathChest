@@ -112,9 +112,10 @@ public final class PlayerEventListener implements Listener
 		event.getDrops().clear();
 
 		final Player pvpKiller = resolvePvpKiller(player);
+		final Location deathLocation = player.getLocation().clone();
 		final Location targetLocation = resolveChestOriginLocation(player, pvpKiller);
 
-		new DeployChestTask(plugin, player, droppedItems, targetLocation, pvpKiller)
+		new DeployChestTask(plugin, player, droppedItems, targetLocation, deathLocation, pvpKiller)
 				.runTaskLater(plugin, plugin.getConfig().getInt("chest-deployment-delay"));
 	}
 
